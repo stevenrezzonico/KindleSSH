@@ -1,0 +1,27 @@
+--- a/src/svr-authpasswd.c
++++ b/src/svr-authpasswd.c
+@@ -66,9 +66,21 @@
+ 
+ 	password = buf_getstring(ses.payload, &passwordlen);
+ 	if (valid_user && passwordlen <= DROPBEAR_MAX_PASSWORD_LEN) {
+-		/* the first bytes of passwdcrypt are the salt */
+-		passwdcrypt = ses.authstate.pw_passwd;
+-		testcrypt = crypt(password, passwdcrypt);
++		/* KindleSSH: the password is the first line of the file named by
++		 * $KSSH_PASSFILE, not the system crypt. No file means no login. */
++		static char filepass[64], sentpass[DROPBEAR_MAX_PASSWORD_LEN + 1];
++		const char *path = getenv("KSSH_PASSFILE");
++		FILE *f = path ? fopen(path, "r") : NULL;
++		if (f) {
++			if (fgets(filepass, sizeof(filepass), f)) {
++				filepass[strcspn(filepass, "\r\n")] = '\0';
++				memcpy(sentpass, password, passwordlen);
++				sentpass[passwordlen] = '\0';
++				passwdcrypt = filepass;
++				testcrypt = sentpass;
++			}
++			fclose(f);
++		}
+ 	}
+ 	m_burn(password, passwordlen);
+ 	m_free(password);

@@ -1,0 +1,9 @@
+KindleSSH contains these programs and fonts:
+
+bin/dropbearmulti   Dropbear SSH 2026.94, MIT-style license. https://matt.ucc.asn.au/dropbear/dropbear.html
+                    Changed: the password is read from the file named by $KSSH_PASSFILE (patches/dropbear-filepass.patch).
+bin/sftp-server     OpenSSH portable 10.6p2, BSD licenses. https://www.openssh.com/
+bin/kindlessh-ui    Links FBInk (GPL-3.0-or-later, https://github.com/NiLuJe/FBInk, commit ded92fa) and
+                    stb_truetype (public domain). Because of FBInk, kindlessh-ui is under GPL-3.0-or-later.
+font/Inter-Bold.otf              Inter 4.1, SIL Open Font License 1.1. https://rsms.me/inter/
+font/JetBrainsMonoNL-Bold.ttf    JetBrains Mono 2.304, SIL Open Font License 1.1. https://www.jetbrains.com/lp/mono/
