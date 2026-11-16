@@ -21,6 +21,9 @@ root SSH + SFTP server on and off.
   file-transfer (MTP) device. **TURN USB NETWORK OFF** or a restart brings file transfer back.
 - The Kindle does not sleep while SSH or USB network is on (sleep would turn Wi-Fi off). It can
   sleep again when both are off. Turn them off when you are done: an awake Kindle uses more battery.
+- Login without a password: put your public key in `KindleSSH/etc/authorized_keys` on the Kindle
+  (one key per line), then turn SSH off and on. Anyone who can write that file, for example over USB,
+  gets root login while SSH is on.
 - **CHANGE PORT** opens a keypad. It is available while SSH is off.
 - **CLOSE** returns to the Kindle home screen. The server stays on until TURN SSH OFF or a restart.
 - The app closes itself after 5 minutes without a tap.
@@ -53,12 +56,14 @@ tests, and writes `dist/` and the screenshots in `shots/`. Work files go to `~/k
 |---|---|
 | `src/ui.c`, `src/ui.h` | Screen drawing and tap handling. Runs on the PC too. |
 | `src/main.c` | Kindle side: e-ink output (FBInk), touch input. |
-| `src/sshctl.sh` | Server control: `on [PORT]`, `off`, `status`, `usb on|off`. |
+| `src/sshctl.sh` | Server control: `on [PORT]`, `off`, `status`, `usb on|off`, `rescue [APP]` (brings the Kindle screen back after a hung full-screen app). |
 | `src/KindleSSH.sh` | The scriptlet that the library shows. |
-| `src/ktap.c` | `ktap X Y`: taps the screen from an SSH session, for tests. Installed as `KindleSSH/bin/ktap`. |
+| `src/ktap.c` | `ktap`: taps, swipes and long presses from an SSH session, for tests. Installed as `KindleSSH/bin/ktap`. |
+| `tools/kdev` | PC side: one command for key setup, shell, file copy, screenshot, touch, timed run, rescue. `bash tools/kdev` prints the list. |
+| `template/` | Starting point for a new Kindle app. |
 | `tools/fb2png.py` | PC side: turns a framebuffer dump from SSH into a PNG screenshot. Usage is in the file. |
 | `KINDLE-DEV.md` | What is known about this Kindle for building more apps. |
-| `patches/` | Dropbear change: password from a file, and build options. |
+| `patches/` | Dropbear changes: password from a file, key file without permission checks, build options. |
 | `tests/` | UI test and screenshots, control script test, server test under qemu. |
 
 USB networking uses the firmware's own switch (`volumd useUsbForNetwork`) to keep the Kindle out of

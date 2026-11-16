@@ -21,6 +21,18 @@ everything here is this repository (`build.sh`, `src/`, `tests/`).
 
 ## 2. Getting access (every session)
 
+Short way, when the key is installed (it is, on the owner's PC: `~/.ssh/kindle_dev` in WSL):
+
+1. The owner opens KindleSSH on the Kindle and taps TURN SSH ON (needed again after every restart).
+2. `bash tools/kdev host` finds the Kindle. Then use `kdev` for everything (`bash tools/kdev` prints
+   the commands). No password is needed.
+
+`kdev` tries the USB network address, then the last address that worked. For another address set
+`KDEV_HOST`. First-time key setup on a new PC: `KDEV_PASS=password-on-screen bash tools/kdev key`.
+Public keys live on the Kindle in `/mnt/us/KindleSSH/etc/authorized_keys`.
+
+Long way, with the password:
+
 1. The owner opens KindleSSH on the Kindle and taps TURN SSH ON.
 2. The owner gives the WI-FI address and the 8-character password. The user is `root`, the
    port is 22 unless changed. **The password is new at every TURN SSH ON**, so ask again after any
@@ -42,7 +54,8 @@ Delete the ask-pass file at the end of the session.
 
 Network facts:
 
-- WSL2 reaches the Kindle's Wi-Fi address directly.
+- WSL2 reaches the Kindle's Wi-Fi address directly. With USB network mode on and the cable in, the
+  Wi-Fi address answered too (one earlier try failed; cause not found).
 - **Plugging the USB cable in puts the Kindle in MTP mode and Wi-Fi goes off.** Work over Wi-Fi with
   the cable out, or use USB network mode.
 - USB network mode (KindleSSH button; unplug, tap ON, plug in): Kindle is `169.254.15.244`. Reached
@@ -143,6 +156,11 @@ Safety rules for any full-screen app:
 - Give the app a way out that does not need touch (KindleSSH closes itself after 5 idle minutes).
 - Last resort for the owner: hold the power button about 40 seconds to restart.
 - When testing over SSH, `killall APPNAME` triggers the launcher's restore.
+- If the screen stays frozen: `kdev rescue [APPNAME]` (on the Kindle: `sh /mnt/us/KindleSSH/bin/sshctl.sh
+  rescue [APPNAME]`) stops the app and runs the restore steps. Tested.
+- To try a program before it has a launcher: `kdev run 'APP_DIR=/mnt/us/MyApp /mnt/us/MyApp/bin/myapp' 60`.
+  It pauses the Kindle UI, shows the program's output, and restores the UI when the program ends,
+  after 60 seconds, or when the SSH session is cut. Tested.
 - Behaviour when the Kindle sleeps and wakes under a full-screen app: not checked.
 
 ## 8. System tools found on the Kindle
@@ -169,6 +187,10 @@ The working USB network recipe is `usb_on()` in `src/sshctl.sh`.
 Both were tested on the Kindle. Together they let Claude run a tap-and-look test with no person
 at the device.
 
+Short forms: `kdev shot [FILE] [--half]`, `kdev tap X Y`, `kdev swipe X1 Y1 X2 Y2 [MS]`,
+`kdev hold X Y [MS]`. `--half` writes 636 x 848: text stays readable and the picture costs a quarter.
+The long forms below are what `kdev` runs.
+
 **Screenshot.** `/dev/fb0` holds what the screen shows, for our apps and for the Kindle's own UI.
 8 bits per pixel, 1272 bytes per row, 1272 x 3392 virtual (two pages; the visible one is first).
 
@@ -180,27 +202,33 @@ ssh -n $O root@ADDRESS 'cd /sys/class/graphics/fb0; echo "$(head -1 modes) $(cat
 Then read `shot.png`. A screenshot of KindleSSH shows the SSH password, and one of the home screen
 shows the owner's library: keep screenshots out of the repository.
 
-**Tap.** `ktap` writes finger events into the touch device. Coordinates are screen pixels.
+**Touch.** `ktap` writes finger events into the touch device. Coordinates are screen pixels.
 
 ```bash
 ssh -n $O root@ADDRESS '/mnt/us/KindleSSH/bin/ktap 184 560'        # one tap
 ssh -n $O root@ADDRESS '/mnt/us/KindleSSH/bin/ktap 360 615 910 1260' # two taps, 0.5 s apart
+ssh -n $O root@ADDRESS '/mnt/us/KindleSSH/bin/ktap swipe 636 1400 636 500 400' # scrolls the home screen down
+ssh -n $O root@ADDRESS '/mnt/us/KindleSSH/bin/ktap hold 636 1000 800'  # long press, 800 ms
 ```
 
 - The taps reach an app that holds the touch device with `EVIOCGRAB`, and they reach the Kindle's
   own UI.
 - To start an app from the library: screenshot the home screen, find the icon, tap it. The app is
   up about 5 seconds later.
-- Taps only. Swipes and long presses are not built.
+- One finger only. The swipe was checked on the home screen. The long press reached our app as a
+  tap; its effect on the Kindle's own UI was not checked.
 
 ## 10. Work loop for a new app
 
+0. Copy `template/` to a new folder. It is a working app (a counter with one button): pure `ui.c`,
+   device `main.c`, `preview.c` tests and screenshots, launcher, `build.sh`. Set `APP` and `BIN` in
+   its `build.sh`. It was built and run on the Kindle.
 1. Write logic and drawing as PC-testable code. Check screenshots and tests on the PC.
-2. Cross-compile static. Smoke-run under `qemu-arm`.
-3. Upload with SFTP to `/mnt/us/AppName/`. To replace a running program: upload as `name.new`,
-   `killall name`, `mv name.new name`.
-4. Run it over SSH. Drive it with `ktap`, look with a screenshot (section 9), and read its log
-   (KindleSSH logs every tap with coordinates).
+2. Cross-compile static (`bash build.sh` in the app folder).
+3. Upload: `kdev sh 'mkdir -p /mnt/us/AppName/bin /mnt/us/AppName/font'`, then `kdev push LOCAL REMOTE`
+   per file. `push` uploads as `name.new` and renames, so it can replace a program that is running.
+4. Run it with `kdev run` (section 7). Drive it with `kdev tap`, look with `kdev shot --half`, read
+   its output (the template logs every tap with coordinates).
 5. Put the final files in a `dist/` folder laid out like the Kindle drive, for install by USB copy.
 
 ## 11. Limits set by the owner

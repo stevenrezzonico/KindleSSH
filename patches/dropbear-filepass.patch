@@ -25,3 +25,17 @@
  	}
  	m_burn(password, passwordlen);
  	m_free(password);
+--- a/src/svr-authpubkey.c
++++ b/src/svr-authpubkey.c
+@@ -613,6 +613,11 @@
+ 
+ 	TRACE(("enter checkfileperm(%s)", filename))
+ 
++	/* KindleSSH: the key file is on user storage, which has no owners and no permissions */
++	if (getenv("KSSH_PASSFILE")) {
++		return DROPBEAR_SUCCESS;
++	}
++
+ 	if (stat(filename, &filestat) != 0) {
+ 		TRACE(("leave checkfileperm: stat() != 0"))
+ 		return DROPBEAR_FAILURE;

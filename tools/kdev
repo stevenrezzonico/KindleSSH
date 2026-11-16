@@ -1,0 +1,81 @@
+#!/bin/bash
+# kdev: work on the Kindle from the PC (WSL or Linux) through KindleSSH. SSH must be on at the Kindle.
+#
+#   kdev key                  one time: make a key pair and install it (needs KDEV_PASS=the password on screen)
+#   kdev sh COMMAND           run a command on the Kindle
+#   kdev push LOCAL REMOTE    copy a file to the Kindle (replaces a running program safely)
+#   kdev pull REMOTE LOCAL    copy a file from the Kindle
+#   kdev shot [FILE] [--half] screenshot of the real screen (default shot.png; --half = quarter of the pixels)
+#   kdev tap X Y [X Y ...]    tap;  kdev swipe X1 Y1 X2 Y2 [MS];  kdev hold X Y [MS]
+#   kdev run COMMAND [SECS]   run a full-screen program with the Kindle UI paused; after SECS (default 60)
+#                             or when it ends, the Kindle UI comes back
+#   kdev rescue [APP]         stop APP and bring the Kindle UI back
+#   kdev log [FILE]           print a log (default /mnt/us/KindleSSH/log.txt)
+#   kdev host                 print the address in use
+#
+# Address: $KDEV_HOST, or the USB network address, or the last address that worked. Port: $KDEV_PORT (22).
+set -euo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+KEY=${KDEV_KEY:-$HOME/.ssh/kindle_dev}
+CONF=${XDG_CONFIG_HOME:-$HOME/.config}/kdev
+PORT=${KDEV_PORT:-22}
+K=/mnt/us/KindleSSH
+# The host key is not checked: it would only protect against a fake Kindle on your own network.
+OPTS=(-p "$PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10)
+
+find_host() {
+	local h
+	for h in ${KDEV_HOST:-169.254.15.244 $(cat "$CONF/host" 2>/dev/null)}; do
+		if timeout 2 bash -c "</dev/tcp/$h/$PORT" 2>/dev/null; then
+			mkdir -p "$CONF"; echo "$h" >"$CONF/host"; HOST=$h; return
+		fi
+	done
+	echo "kdev: no Kindle found. Open KindleSSH, tap TURN SSH ON, then set KDEV_HOST=address." >&2; exit 1
+}
+
+kssh() { ssh -n "${OPTS[@]}" -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes "root@$HOST" "$@"; }
+ksftp() { sftp -q "${OPTS[@]/#-p/-P}" -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes "root@$HOST" >/dev/null; }
+
+cmd=${1:-}; [ $# -gt 0 ] && shift
+case "$cmd" in
+key)
+	: "${KDEV_PASS:?set KDEV_PASS to the password on the Kindle screen}"
+	find_host
+	[ -f "$KEY" ] || { mkdir -p "$(dirname "$KEY")"; ssh-keygen -q -t ed25519 -N '' -C kdev -f "$KEY"; }
+	ask=$(mktemp); trap 'rm -f "$ask"' EXIT
+	printf '#!/bin/sh\necho "$KDEV_PASS"\n' >"$ask"; chmod 700 "$ask"
+	pub=$(cat "$KEY.pub")
+	# Asks for nothing on the terminal: the password comes from the helper file.
+	KDEV_PASS=$KDEV_PASS SSH_ASKPASS=$ask SSH_ASKPASS_REQUIRE=force ssh -n "${OPTS[@]}" -o PubkeyAuthentication=no \
+		-o NumberOfPasswordPrompts=1 "root@$HOST" \
+		"mkdir -p $K/etc; grep -qxF '$pub' $K/etc/authorized_keys 2>/dev/null || echo '$pub' >>$K/etc/authorized_keys"
+	kssh true && echo "key login works: $HOST" || echo "key stored. This server is older than key login: update KindleSSH, then TURN SSH OFF and ON."
+	;;
+sh)     find_host; kssh "$*";;
+push)   find_host; printf 'put "%s" "%s.new"\n' "$1" "$2" | ksftp; kssh "chmod +x '$2.new'; mv '$2.new' '$2'";;
+pull)   find_host; printf 'get "%s" "%s"\n' "$1" "$2" | ksftp;;
+shot)
+	find_host; out=shot.png; half=
+	for a in "$@"; do if [ "$a" = --half ]; then half=--half; else out=$a; fi; done
+	kssh 'cd /sys/class/graphics/fb0; echo "$(head -1 modes) $(cat bits_per_pixel) $(cat stride)"; cat /dev/fb0' \
+		| python3 "$HERE/fb2png.py" "$out" $half
+	echo "$out"
+	;;
+tap)    find_host; kssh "$K/bin/ktap $*";;
+swipe|hold) find_host; kssh "$K/bin/ktap $cmd $*";;
+run)
+	find_host; secs=${2:-60}
+	# The trap brings the Kindle UI back also when this SSH session is cut.
+	kssh "trap 'sh $K/bin/sshctl.sh rescue >/dev/null' EXIT; trap 'exit 1' HUP INT TERM
+		lipc-set-prop com.lab126.pillow disableEnablePillow disable
+		[ -f /etc/upstart/statusbar.conf ] && stop statusbar
+		killall -STOP awesome
+		sh -c $(printf %q "$1") & p=\$!
+		i=0; while kill -0 \$p 2>/dev/null && [ \$i -lt $secs ]; do sleep 1; i=\$((i + 1)); done
+		if kill -0 \$p 2>/dev/null; then pkill -P \$p; kill \$p; echo 'kdev: stopped after $secs s'; else wait \$p; echo \"kdev: exit code \$?\"; fi"
+	;;
+rescue) find_host; kssh "sh $K/bin/sshctl.sh rescue $* >/dev/null" && echo "Kindle UI restored";;
+log)    find_host; kssh "cat '${1:-$K/log.txt}'";;
+host)   find_host; echo "$HOST";;
+*)      sed -n '2,16p' "$0" | cut -c3-; exit 2;;
+esac

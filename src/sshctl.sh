@@ -1,6 +1,7 @@
 #!/bin/sh
 # KindleSSH server control. Runs on the Kindle's busybox sh.
-#   sshctl.sh on [PORT] | off | status | usb on|off
+#   sshctl.sh on [PORT] | off | status | usb on|off | rescue [APP]
+# Key login: put public keys in $D/etc/authorized_keys. The password login stays.
 # State lives in RAM ($R), so a reboot clears it. Only the host key and the last port are kept on disk.
 D=${KSSH_DIR:-/mnt/us/KindleSSH}
 R=${KSSH_RUN:-/tmp/kindlessh}
@@ -76,7 +77,7 @@ on)
 	echo "$port" >$R/port
 	echo "$port" >$D/etc/port
 	iptables -I INPUT -p tcp --dport "$port" -j ACCEPT
-	KSSH_PASSFILE=$R/password $DB dropbear -F -p "$port" -r $D/etc/hostkey \
+	KSSH_PASSFILE=$R/password $DB dropbear -F -p "$port" -r $D/etc/hostkey -D $D/etc \
 		>>$R/dropbear.log 2>&1 </dev/null &
 	echo $! >$R/pid
 	sleep 1
@@ -92,10 +93,18 @@ usb)
 	*) exit 2;;
 	esac
 	;;
+rescue)
+	# Brings the Kindle's own screen back when a full-screen app hangs or dies without its restore steps.
+	[ -n "$2" ] && killall "$2" 2>/dev/null && sleep 1
+	killall -CONT awesome
+	[ -f /etc/upstart/statusbar.conf ] && start statusbar
+	lipc-set-prop com.lab126.pillow disableEnablePillow enable
+	lipc-set-prop com.lab126.appmgrd start app://com.lab126.booklet.home
+	;;
 status)
 	;;
 *)
-	echo "usage: $0 on [PORT] | off | status | usb on|off" >&2; exit 2
+	echo "usage: $0 on [PORT] | off | status | usb on|off | rescue [APP]" >&2; exit 2
 	;;
 esac
 

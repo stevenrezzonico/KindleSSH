@@ -1,0 +1,5 @@
+__pycache__/
+template/out/
+template/dist/
+template/shots/
+shot*.png

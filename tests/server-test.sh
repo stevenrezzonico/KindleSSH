@@ -7,7 +7,7 @@ check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: got '$2' 
 
 $Q $B/dropbearmulti dropbearkey -t ed25519 -f $T/hostkey >/dev/null 2>&1
 echo "Abc23xyz" > $T/password
-KSSH_PASSFILE=$T/password $Q $B/dropbearmulti dropbear -F -p 127.0.0.1:$PORT -r $T/hostkey 2>$T/log &
+KSSH_PASSFILE=$T/password $Q $B/dropbearmulti dropbear -F -p 127.0.0.1:$PORT -r $T/hostkey -D $T 2>$T/log &
 pid=$!; sleep 1
 
 printf '#!/bin/sh\ncat %s/try\n' $T > $T/askpass; chmod +x $T/askpass
@@ -20,6 +20,14 @@ login() { # $1 = password to try; prints the remote output
 check "right password logs in" "$(login Abc23xyz)" "in"
 check "wrong password fails"   "$(login Abc23xyZ)" ""
 check "empty password fails"   "$(login '')" ""
+ssh-keygen -q -t ed25519 -N '' -f $T/key; cp $T/key.pub $T/authorized_keys
+keylogin() { # $1 = private key file
+  ssh -n -p $PORT -i $1 -o IdentitiesOnly=yes -o PasswordAuthentication=no -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR 127.0.0.1 'echo in' 2>/dev/null
+}
+check "listed key logs in" "$(keylogin $T/key)" "in"
+ssh-keygen -q -t ed25519 -N '' -f $T/other
+check "unlisted key fails" "$(keylogin $T/other)" ""
 rm $T/password
 check "no password file fails" "$(login Abc23xyz)" ""
 kill $pid

@@ -12,10 +12,11 @@ cat >$T/app/bin/dropbearmulti <<'EOF'
 [ "$1" = dropbearkey ] && { echo key >"$5"; exit 0; }
 exec sleep 600
 EOF
+sed -i "2i echo \"\$@\" >>$T/dropbear.log" $T/app/bin/dropbearmulti
 printf '#!/bin/sh\necho "$@" >>%s/iptables.log\n' $T >$T/stub/iptables
-printf '#!/bin/sh\necho "$3" >%s/sleepstate\n' $T >$T/stub/lipc-set-prop
+printf '#!/bin/sh\necho "$@" >>%s/lipc.log\n[ "$2" = preventScreenSaver ] && echo "$3" >%s/sleepstate\n' $T $T >$T/stub/lipc-set-prop
 printf '#!/bin/sh\ncat %s/sleepstate 2>/dev/null\n' $T >$T/stub/lipc-get-prop
-printf '#!/bin/sh\nexit 0\n' >$T/stub/killall
+printf '#!/bin/sh\necho "$@" >>%s/killall.log\n' $T >$T/stub/killall
 chmod +x $T/app/bin/* $T/stub/*
 run() { out=$(PATH=$T/stub:$PATH KSSH_DIR=$T/app KSSH_RUN=$T/run sh $S "$@" 2>&1); rc=$?; }
 
@@ -37,6 +38,12 @@ echo 1 >$T/sleepstate
 run status;        check "status does not change sleep" "$(cat $T/sleepstate)" 1
 run off;           check "sleep allowed again after off" "$(cat $T/sleepstate)" 0
 run status;        check "usb off (the gadget needs a real Kindle)" "$(get usb)" ""
+run on;            check "key file folder given to the server" "$(tail -1 $T/dropbear.log | grep -c -- "-D $T/app/etc")" 1
+run rescue myapp;  check "rescue kills the app" "$(grep -c '^myapp$' $T/killall.log)" 1
+check "rescue wakes the Kindle UI" "$(grep -c -- '-CONT awesome' $T/killall.log)" 1
+check "rescue asks for the home screen" "$(grep -c 'appmgrd start app://com.lab126.booklet.home' $T/lipc.log)" 1
+check "rescue leaves SSH on" "$(get ssh)" on
+run off
 
 rm -rf $T
 exit $fail
