@@ -46,7 +46,7 @@ Network facts:
 - **Plugging the USB cable in puts the Kindle in MTP mode and Wi-Fi goes off.** Work over Wi-Fi with
   the cable out, or use USB network mode.
 - USB network mode (KindleSSH button; unplug, tap ON, plug in): Kindle is `169.254.15.244`. Reached
-  from Windows with no setup. From inside WSL: not checked.
+  from Windows and from inside WSL with no setup.
 - `sshctl.sh` on the Kindle (`sh /mnt/us/KindleSSH/bin/sshctl.sh status`) prints `ssh=`, `port=`,
   `password=`, `usb=`. `off` ends your own session.
 
@@ -164,17 +164,46 @@ USB internals: gadget through configfs at `/sys/kernel/config/usb_gadget/`, cont
 present: `usb_f_rndis`, `usb_f_ecm`, `usb_f_acm`, `usb_f_serial`, `usb_f_mass_storage`, `g_ether`.
 The working USB network recipe is `usb_on()` in `src/sshctl.sh`.
 
-## 9. Work loop for a new app
+## 9. Seeing and touching the screen from SSH
+
+Both were tested on the Kindle. Together they let Claude run a tap-and-look test with no person
+at the device.
+
+**Screenshot.** `/dev/fb0` holds what the screen shows, for our apps and for the Kindle's own UI.
+8 bits per pixel, 1272 bytes per row, 1272 x 3392 virtual (two pages; the visible one is first).
+
+```bash
+ssh -n $O root@ADDRESS 'cd /sys/class/graphics/fb0; echo "$(head -1 modes) $(cat bits_per_pixel) $(cat stride)"; cat /dev/fb0' \
+    | python3 tools/fb2png.py shot.png
+```
+
+Then read `shot.png`. A screenshot of KindleSSH shows the SSH password, and one of the home screen
+shows the owner's library: keep screenshots out of the repository.
+
+**Tap.** `ktap` writes finger events into the touch device. Coordinates are screen pixels.
+
+```bash
+ssh -n $O root@ADDRESS '/mnt/us/KindleSSH/bin/ktap 184 560'        # one tap
+ssh -n $O root@ADDRESS '/mnt/us/KindleSSH/bin/ktap 360 615 910 1260' # two taps, 0.5 s apart
+```
+
+- The taps reach an app that holds the touch device with `EVIOCGRAB`, and they reach the Kindle's
+  own UI.
+- To start an app from the library: screenshot the home screen, find the icon, tap it. The app is
+  up about 5 seconds later.
+- Taps only. Swipes and long presses are not built.
+
+## 10. Work loop for a new app
 
 1. Write logic and drawing as PC-testable code. Check screenshots and tests on the PC.
 2. Cross-compile static. Smoke-run under `qemu-arm`.
 3. Upload with SFTP to `/mnt/us/AppName/`. To replace a running program: upload as `name.new`,
    `killall name`, `mv name.new name`.
-4. Run it over SSH and read its log. Ask the owner what the screen shows, or have the app log
-   what it does (KindleSSH logs every tap with coordinates).
+4. Run it over SSH. Drive it with `ktap`, look with a screenshot (section 9), and read its log
+   (KindleSSH logs every tap with coordinates).
 5. Put the final files in a `dist/` folder laid out like the Kindle drive, for install by USB copy.
 
-## 10. Limits set by the owner
+## 11. Limits set by the owner
 
 - Nothing on the system partition. No boot jobs. Everything under `/mnt/us/AppName/` plus one
   scriptlet in `/mnt/us/documents/`.

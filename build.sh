@@ -70,6 +70,7 @@ fi
 
 arm-cc -Os -Wall -Wextra -I$P/src -IFBInk -isystem FBInk/stb -o $OUT/kindlessh-ui $P/src/main.c $P/src/ui.c \
 	FBInk/Release/libfbink.a FBInk/libi2c-staged/lib/libi2c.a -lm -static -s
+arm-cc -Os -Wall -Wextra -static -s -o $OUT/ktap $P/src/ktap.c
 
 # Tests: UI logic and screenshots on the PC, control script with stubs, ARM server under qemu with real ssh/sftp.
 mkdir -p $P/shots
@@ -81,7 +82,7 @@ bash $P/tests/server-test.sh $OUT
 rm -rf $P/dist
 mkdir -p $P/dist/documents $P/dist/KindleSSH/bin $P/dist/KindleSSH/font
 cp $P/src/KindleSSH.sh $P/dist/documents/
-cp $OUT/kindlessh-ui $OUT/dropbearmulti $OUT/sftp-server $P/src/sshctl.sh $P/dist/KindleSSH/bin/
+cp $OUT/kindlessh-ui $OUT/ktap $OUT/dropbearmulti $OUT/sftp-server $P/src/sshctl.sh $P/dist/KindleSSH/bin/
 cp $OUT/font/* $P/dist/KindleSSH/font/
 cp $P/shots/icon.png $P/dist/KindleSSH/
 cp $P/LICENSES.txt $P/dist/KindleSSH/

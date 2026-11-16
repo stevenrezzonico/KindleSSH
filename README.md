@@ -55,6 +55,9 @@ tests, and writes `dist/` and the screenshots in `shots/`. Work files go to `~/k
 | `src/main.c` | Kindle side: e-ink output (FBInk), touch input. |
 | `src/sshctl.sh` | Server control: `on [PORT]`, `off`, `status`, `usb on|off`. |
 | `src/KindleSSH.sh` | The scriptlet that the library shows. |
+| `src/ktap.c` | `ktap X Y`: taps the screen from an SSH session, for tests. Installed as `KindleSSH/bin/ktap`. |
+| `tools/fb2png.py` | PC side: turns a framebuffer dump from SSH into a PNG screenshot. Usage is in the file. |
+| `KINDLE-DEV.md` | What is known about this Kindle for building more apps. |
 | `patches/` | Dropbear change: password from a file, and build options. |
 | `tests/` | UI test and screenshots, control script test, server test under qemu. |
 
