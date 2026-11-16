@@ -1,3 +1,5 @@
+KindleSSH own code (src/, tests/, build.sh): GPL-3.0-or-later, see LICENSE in the source repository.
+
 KindleSSH contains these programs and fonts:
 
 bin/dropbearmulti   Dropbear SSH 2026.94, MIT-style license. https://matt.ucc.asn.au/dropbear/dropbear.html

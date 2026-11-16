@@ -62,3 +62,8 @@ USB networking uses the firmware's own switch (`volumd useUsbForNetwork`) to kee
 MTP mode, then replaces the stock `g_ether` driver (Windows takes it for a serial port) with an
 RNDIS gadget built through configfs. If the cable is plugged in while USB network is off, the Kindle
 enters MTP mode and turns Wi-Fi off.
+
+## License
+
+The code written for KindleSSH is under the GNU General Public License, version 3 or later
+(see `LICENSE`). The bundled programs and fonts keep their own licenses: see `LICENSES.txt`.
