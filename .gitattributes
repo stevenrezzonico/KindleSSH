@@ -1,0 +1,2 @@
+# Scripts run on the Kindle: line endings must stay LF on every checkout.
+* text=auto eol=lf
